@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "mammoth": "^1.11.0",
+    "pdfjs-dist": "^5.4.624",
+    "react-hook-form": "^7.71.2",
+    "tailwindcss": "^4.2.1"
+  }
+}

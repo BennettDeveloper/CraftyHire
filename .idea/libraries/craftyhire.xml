@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="craftyhire">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/craftyhire.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
