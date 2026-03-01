@@ -1,0 +1,79 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.3'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.app'
+version = '0.0.1-SNAPSHOT'
+description = 'Tailor fit Resume for Hiring'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// ── Web ──────────────────────────────────────────────────────────────
+	// Spring MVC for REST controllers
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+	// ── Security ─────────────────────────────────────────────────────────
+	// Spring Security for authentication and authorization
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+
+	// JWT: API, implementation, and Jackson (JSON) integration
+	// Used to generate and validate access/refresh tokens
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly    'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly    'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	// ── Validation ────────────────────────────────────────────────────────
+	// @Valid, @NotBlank, @Email, etc. on request DTOs
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// ── Persistence ───────────────────────────────────────────────────────
+	// JPA + Hibernate for User entity persistence
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+	// H2 in-memory database for the demo.
+	// Swap for PostgreSQL/MySQL in production by replacing this dependency
+	// and updating application.properties datasource settings.
+	runtimeOnly 'com.h2database:h2'
+
+	// ── File Parsing ──────────────────────────────────────────────────────
+	// Apache PDFBox: parse uploaded PDF resumes AND generate PDF output
+	implementation 'org.apache.pdfbox:pdfbox:3.0.3'
+
+	// Apache POI: parse uploaded DOCX resumes AND generate DOCX output
+	implementation 'org.apache.poi:poi-ooxml:5.3.0'
+
+	// ── Developer Tools ───────────────────────────────────────────────────
+	// Hot reload during development (disabled in production builds)
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	// ── Lombok ───────────────────────────────────────────────────────────
+	// Reduces boilerplate: @Data, @Builder, @AllArgsConstructor, etc.
+	compileOnly            'org.projectlombok:lombok'
+	annotationProcessor    'org.projectlombok:lombok'
+
+	// ── Testing ───────────────────────────────────────────────────────────
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly    'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
