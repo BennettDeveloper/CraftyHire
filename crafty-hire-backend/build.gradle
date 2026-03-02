@@ -52,6 +52,12 @@ dependencies {
 	// and updating application.properties datasource settings.
 	runtimeOnly 'com.h2database:h2'
 
+	// ── Jackson (JSON) ────────────────────────────────────────────────────
+	// Spring Boot 4 ships Jackson 3.x under the new tools.jackson group ID.
+	// Declared explicitly so the IDE resolves tools.jackson.* imports directly.
+	// Version is managed by the Spring Boot BOM.
+	implementation 'tools.jackson.core:jackson-databind'
+
 	// ── File Parsing ──────────────────────────────────────────────────────
 	// Apache PDFBox: parse uploaded PDF resumes AND generate PDF output
 	implementation 'org.apache.pdfbox:pdfbox:3.0.3'

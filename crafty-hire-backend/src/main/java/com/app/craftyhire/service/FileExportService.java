@@ -255,14 +255,16 @@ public class FileExportService {
      * Standard Type 1 fonts (Helvetica, Times) only support the Windows-1252 charset.
      */
     private String sanitizeForPdf(String text) {
+        // All arguments use String literals (double quotes) so Java resolves
+        // replace(CharSequence, CharSequence) — mixing char and String is not allowed.
         return text
-                .replace('\u2022', '-')     // bullet •
-                .replace('\u2013', '-')     // en dash –
-                .replace('\u2014', "--")    // em dash —
-                .replace('\u201c', "\"")    // left double quote "
-                .replace('\u201d', "\"")    // right double quote "
-                .replace('\u2018', "'")     // left single quote '
-                .replace('\u2019', "'")     // right single quote '
+                .replace("\u2022", "-")     // bullet •
+                .replace("\u2013", "-")     // en dash –
+                .replace("\u2014", "--")    // em dash —
+                .replace("\u201c", "\"")    // left double quote "
+                .replace("\u201d", "\"")    // right double quote "
+                .replace("\u2018", "'")     // left single quote '
+                .replace("\u2019", "'")     // right single quote '
                 .replaceAll("[^\\x00-\\x7E]", ""); // drop remaining non-ASCII
     }
 

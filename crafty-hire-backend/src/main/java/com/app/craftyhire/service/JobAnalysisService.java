@@ -2,8 +2,10 @@ package com.app.craftyhire.service;
 
 import com.app.craftyhire.model.SkillGap;
 import com.app.craftyhire.model.SkillScore;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+// Jackson 3.x (shipped with Spring Boot 4) moved to the tools.jackson group ID
+// and tools.jackson.* package names — replacing the old com.fasterxml.jackson.*
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

@@ -68,8 +68,9 @@ public class ApplicationConfig {
      */
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService());
+        // Spring Security 7.x: UserDetailsService is required in the constructor.
+        // The no-arg constructor and setUserDetailsService() were removed.
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
