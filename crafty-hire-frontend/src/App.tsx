@@ -63,11 +63,12 @@ export default function App() {
   const [skillAnalysis, setSkillAnalysis] = useState<SkillAnalysisResponse | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [skillAnswers, setSkillAnswers] = useState<SkillAnswer[]>([]);
-  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('PDF');
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('DOCX');
   const [generatedResume, setGeneratedResume] = useState<GenerateDocumentResponse | null>(null);
   const [generatedCoverLetter, setGeneratedCoverLetter] = useState<GenerateDocumentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [generatingType, setGeneratingType] = useState<DocumentType | null>(null);
 
   function resetWorkspace() {
     setAppState('idle');
@@ -137,18 +138,26 @@ export default function App() {
     [skillAnswers, currentQuestionIndex, skillAnalysis],
   );
 
+  // ─── Regenerate — go back to ready so user can pick what to generate next ──
+  function handleRegenerate() {
+    setAppState('ready');
+  }
+
   // ─── Generate document ─────────────────────────────────────────────────────
   async function handleGenerate(type: DocumentType) {
     setError(null);
+    setGeneratingType(type);
     setAppState('generating');
     setLoading(true);
+    // Cover letters are always exported as DOCX; only resumes respect selectedFormat
+    const format: ExportFormat = type === 'COVER_LETTER' ? 'DOCX' : selectedFormat;
     const prevCL = previousCoverLetter.trim() || undefined;
     try {
       if (type === 'RESUME') {
-        const result = await generateResume(resumeText, jobDescription, selectedFormat, skillAnswers, prevCL);
+        const result = await generateResume(resumeText, jobDescription, format, skillAnswers, prevCL);
         setGeneratedResume(result);
       } else {
-        const result = await generateCoverLetter(resumeText, jobDescription, selectedFormat, skillAnswers, prevCL);
+        const result = await generateCoverLetter(resumeText, jobDescription, format, skillAnswers, prevCL);
         setGeneratedCoverLetter(result);
       }
       setAppState('results');
@@ -207,8 +216,9 @@ export default function App() {
             onAnalyzeGaps={handleAnalyzeGaps}
             onAnswer={handleAnswer}
             onGenerate={handleGenerate}
-            onRegenerate={handleGenerate}
+            onRegenerate={handleRegenerate}
             loading={loading}
+            generatingType={generatingType}
           />
         </div>
       </main>

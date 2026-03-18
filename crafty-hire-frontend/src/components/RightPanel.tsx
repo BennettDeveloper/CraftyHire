@@ -10,6 +10,11 @@ import type {
 import SkillList from './SkillList';
 import QuestionFlow from './QuestionFlow';
 import DocumentResult from './DocumentResult';
+import ProgressBar, {
+  STEPS_ANALYZE_JOB,
+  STEPS_GENERATE_RESUME,
+  STEPS_GENERATE_COVER_LETTER,
+} from './ProgressBar';
 
 interface RightPanelProps {
   appState: AppState;
@@ -23,8 +28,9 @@ interface RightPanelProps {
   onAnalyzeGaps: () => void;
   onAnswer: (answer: SkillAnswer) => void;
   onGenerate: (type: DocumentType) => void;
-  onRegenerate: (type: DocumentType) => void;
+  onRegenerate: () => void;
   loading: boolean;
+  generatingType: DocumentType | null;
 }
 
 export default function RightPanel({
@@ -41,6 +47,7 @@ export default function RightPanel({
   onGenerate,
   onRegenerate,
   loading,
+  generatingType,
 }: RightPanelProps) {
   if (appState === 'idle') {
     return (
@@ -60,14 +67,17 @@ export default function RightPanel({
   }
 
   if (appState === 'analyzing') {
-    return <LoadingCard label="Analyzing job posting..." />;
+    return (
+      <div className="panel-placeholder">
+        <ProgressBar steps={STEPS_ANALYZE_JOB} active={true} variant="panel" />
+      </div>
+    );
   }
 
   if (appState === 'skill_results' && jobAnalysis) {
     return (
       <SkillList
         skills={jobAnalysis.skills}
-        analysis={jobAnalysis.analysis}
         onAnalyzeGaps={onAnalyzeGaps}
         loading={loading}
       />
@@ -96,7 +106,7 @@ export default function RightPanel({
 
         <label className="field-label">Output format</label>
         <div className="format-row">
-          {(['PDF', 'DOCX', 'LATEX'] as ExportFormat[]).map((f) => (
+          {(['DOCX', 'LATEX'] as ExportFormat[]).map((f) => (
             <button
               key={f}
               className={`format-btn${selectedFormat === f ? ' format-btn--active' : ''}`}
@@ -128,7 +138,14 @@ export default function RightPanel({
   }
 
   if (appState === 'generating') {
-    return <LoadingCard label="Generating document..." />;
+    const genSteps = generatingType === 'COVER_LETTER'
+      ? STEPS_GENERATE_COVER_LETTER
+      : STEPS_GENERATE_RESUME;
+    return (
+      <div className="panel-placeholder">
+        <ProgressBar steps={genSteps} active={true} variant="panel" />
+      </div>
+    );
   }
 
   if (appState === 'results') {
@@ -145,11 +162,3 @@ export default function RightPanel({
   return null;
 }
 
-function LoadingCard({ label }: { label: string }) {
-  return (
-    <div className="panel-placeholder">
-      <div className="spinner" aria-hidden="true" />
-      <p className="panel-placeholder__body">{label}</p>
-    </div>
-  );
-}

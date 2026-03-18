@@ -18,9 +18,20 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
     e.preventDefault();
     setError(null);
 
-    if (mode === 'register' && password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
+    if (mode === 'register') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -114,7 +125,7 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
             </div>
           )}
 
-          {error && <p className="field-error">{error}</p>}
+          {error && <div className="auth-alert" role="alert">{error}</div>}
 
           <button
             className="btn btn--primary btn--full"

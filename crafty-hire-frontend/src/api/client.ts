@@ -78,8 +78,13 @@ export async function apiFetch(
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
-      const body = await res.clone().json() as { message?: string; error?: string };
-      message = body.message ?? body.error ?? message;
+      const body = await res.clone().json() as { message?: string; error?: string; fields?: Record<string, string> };
+      if (body.fields && Object.keys(body.fields).length > 0) {
+        // Surface each field-level validation message from the backend
+        message = Object.values(body.fields).join(' · ');
+      } else {
+        message = body.message ?? body.error ?? message;
+      }
     } catch {
       // ignore parse error
     }

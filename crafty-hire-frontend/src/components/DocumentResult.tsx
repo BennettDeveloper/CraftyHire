@@ -6,7 +6,7 @@ import { ApiError } from '../api/client';
 interface DocumentResultProps {
   resume: GenerateDocumentResponse | null;
   coverLetter: GenerateDocumentResponse | null;
-  onRegenerate: (type: DocumentType) => void;
+  onRegenerate: () => void;
   generating: boolean;
 }
 
@@ -77,7 +77,10 @@ export default function DocumentResult({
           {downloadError && <p className="field-error">{downloadError}</p>}
 
           <div className="export-row">
-            {(['PDF', 'DOCX', 'LATEX'] as ExportFormat[]).map((fmt) => (
+            {(activeTab === 'RESUME'
+              ? (['DOCX', 'LATEX'] as ExportFormat[])
+              : (['DOCX'] as ExportFormat[])
+            ).map((fmt) => (
               <button
                 key={fmt}
                 className="btn btn--export"
@@ -91,7 +94,7 @@ export default function DocumentResult({
 
           <button
             className="btn btn--ghost btn--full"
-            onClick={() => onRegenerate(activeTab)}
+            onClick={() => onRegenerate()}
             disabled={generating}
             style={{ marginTop: '0.75rem' }}
           >

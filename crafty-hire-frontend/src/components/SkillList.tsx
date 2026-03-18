@@ -1,13 +1,13 @@
 import type { SkillScore } from '../types';
+import ProgressBar, { STEPS_ANALYZE_GAPS } from './ProgressBar';
 
 interface SkillListProps {
   skills: SkillScore[];
-  analysis: string;
   onAnalyzeGaps: () => void;
   loading: boolean;
 }
 
-export default function SkillList({ skills, analysis, onAnalyzeGaps, loading }: SkillListProps) {
+export default function SkillList({ skills, onAnalyzeGaps, loading }: SkillListProps) {
   // Group skills by category
   const grouped = skills.reduce<Record<string, SkillScore[]>>((acc, skill) => {
     const cat = skill.category || 'Other';
@@ -29,10 +29,6 @@ export default function SkillList({ skills, analysis, onAnalyzeGaps, loading }: 
         </svg>
         <h2 className="right-panel__title">Job Analysis</h2>
       </div>
-
-      {analysis && (
-        <p className="right-panel__analysis">{analysis}</p>
-      )}
 
       <div className="skill-list">
         {Object.entries(grouped).map(([category, categorySkills]) => (
@@ -65,8 +61,11 @@ export default function SkillList({ skills, analysis, onAnalyzeGaps, loading }: 
         disabled={loading}
         style={{ marginTop: '1.25rem' }}
       >
-        {loading ? 'Analyzing skill gaps...' : 'Analyze Skill Gaps'}
+        {loading ? 'Analyzing...' : 'Analyze Skill Gaps'}
       </button>
+      {loading && (
+        <ProgressBar steps={STEPS_ANALYZE_GAPS} active={loading} variant="inline" />
+      )}
     </div>
   );
 }

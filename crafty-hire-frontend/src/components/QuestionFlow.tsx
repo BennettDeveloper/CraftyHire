@@ -92,14 +92,22 @@ export default function QuestionFlow({ questions, currentIndex, onAnswer }: Ques
             onChange={(e) => setOpenEndedText(e.target.value)}
             rows={5}
           />
-          <button
-            className="btn btn--primary btn--full"
-            onClick={() => submit(openEndedText.trim().length > 0, openEndedText.trim())}
-            disabled={submitting || openEndedText.trim().length === 0}
-            style={{ marginTop: '0.75rem' }}
-          >
-            {submitting ? 'Submitting...' : 'Submit Answer'}
-          </button>
+          <div className="openended-actions">
+            <button
+              className="btn btn--primary btn--full"
+              onClick={() => submit(openEndedText.trim().length > 0, openEndedText.trim())}
+              disabled={submitting || openEndedText.trim().length === 0}
+            >
+              {submitting ? 'Submitting...' : 'Submit Answer'}
+            </button>
+            <button
+              className="btn btn--na"
+              onClick={() => submit(false, 'N/A')}
+              disabled={submitting}
+            >
+              N/A
+            </button>
+          </div>
         </div>
       )}
     </div>

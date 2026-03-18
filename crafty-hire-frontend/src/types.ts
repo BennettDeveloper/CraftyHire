@@ -74,5 +74,5 @@ export type AppState =
   | 'generating'
   | 'results';
 
-export type ExportFormat = 'PDF' | 'DOCX' | 'LATEX';
+export type ExportFormat = 'DOCX' | 'LATEX';
 export type DocumentType = 'RESUME' | 'COVER_LETTER';
