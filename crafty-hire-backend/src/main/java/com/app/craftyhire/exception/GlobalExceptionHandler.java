@@ -9,6 +9,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.LinkedHashMap;
@@ -111,6 +112,26 @@ public class GlobalExceptionHandler {
         log.debug("File upload too large: {}", e.getMessage());
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "File is too large. Maximum allowed size is 10MB."));
+    }
+
+    /**
+     * Handles errors returned by the Anthropic Claude API.
+     *
+     * 529 means Claude's servers are temporarily overloaded — this is transient
+     * and the user should simply retry. Any other upstream error is logged and
+     * surfaced as a 502 Bad Gateway so the frontend can distinguish it from an
+     * internal server failure.
+     */
+    @ExceptionHandler(HttpServerErrorException.class)
+    public ResponseEntity<Map<String, String>> handleClaudeApiError(HttpServerErrorException e) {
+        if (e.getStatusCode().value() == 529) {
+            log.warn("Claude API overloaded (529) — advising client to retry");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", "The AI service is temporarily overloaded. Please wait a moment and try again."));
+        }
+        log.error("Upstream API error ({}): {}", e.getStatusCode(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error", "The AI service returned an unexpected error. Please try again."));
     }
 
     /**

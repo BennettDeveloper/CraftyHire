@@ -6,11 +6,16 @@ import com.app.craftyhire.model.SkillAnswer;
 import com.app.craftyhire.model.SkillGap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,6 +51,21 @@ public class ClaudeService {
 
     @Value("${anthropic.api.max-tokens}")
     private int maxTokens;
+
+    /**
+     * Optional LaTeX resume template loaded from the classpath.
+     * If absent, the service falls back to its built-in plain-text output.
+     */
+    @Value("classpath:templates/resumes/resume-tex-template.tex")
+    private Resource resumeLatexTemplateResource;
+
+    /**
+     * Optional DOCX resume template loaded from the classpath.
+     * Bracketed placeholders (e.g. [Full Name]) are filled in by Claude.
+     * If absent, the service falls back to its built-in plain-text output.
+     */
+    @Value("classpath:templates/resumes/resume-docx-template.docx")
+    private Resource resumeDocxTemplateResource;
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -98,47 +118,201 @@ public class ClaudeService {
      * @return tailored resume as plain text
      */
     public String generateResume(ResumeRequest request) {
+
         log.debug("Generating tailored resume for request with {} skill answers",
                 request.getSkillAnswers() == null ? 0 : request.getSkillAnswers().size());
 
         String skillAnswerContext = buildSkillAnswerContext(request.getSkillAnswers());
+        String latexTemplate = loadLatexTemplate();
+        String docxTemplate  = loadDocxTemplateText();
 
-        String prompt = """
-                You are an expert resume writer specializing in ATS (Applicant Tracking System) optimization.
+        // ADD THIS:
+        log.info("Template sizes — LaTeX: {} chars, DOCX: {} chars, Resume: {} chars, JD: {} chars",
+                latexTemplate  == null ? 0 : latexTemplate.length(),
+                docxTemplate   == null ? 0 : docxTemplate.length(),
+                request.getRawResumeText()   == null ? 0 : request.getRawResumeText().length(),
+                request.getJobDescription()  == null ? 0 : request.getJobDescription().length());
 
-                Rewrite the candidate's resume to be perfectly tailored for the target job.
+        boolean isLatex = "LATEX".equalsIgnoreCase(request.getOutputFormat());
+        boolean isDocx  = "WORD".equalsIgnoreCase(request.getOutputFormat())
+                || "DOCX".equalsIgnoreCase(request.getOutputFormat());
 
-                **Requirements:**
-                - Incorporate exact keywords from the job description naturally (not keyword stuffing)
-                - Lead with the most relevant experience for this specific role
-                - Quantify every achievement with numbers, percentages, or scale where possible
-                - Use strong action verbs: led, built, designed, increased, reduced, launched, etc.
-                - Keep bullet points concise (1-2 lines each) and impactful
-                - Do NOT invent experience — only work with what's provided
-                - Maintain a professional, clean tone throughout
+        log.info(">>> generateResume called — format: '{}', isDocx: {}, isLatex: {}, docxTemplate null: {}",
+                request.getOutputFormat(),
+                isDocx,
+                isLatex,
+                loadDocxTemplateText() == null);
 
-                **Output Format:**
-                Return the complete resume as plain text with these section headers (include only sections relevant to the candidate):
-                CONTACT INFORMATION
-                PROFESSIONAL SUMMARY
-                SKILLS
-                WORK EXPERIENCE
-                EDUCATION
-                PROJECTS (if applicable)
-                CERTIFICATIONS (if applicable)
+        String prompt;
 
-                ---
-                CANDIDATE'S CURRENT RESUME:
-                """ + request.getRawResumeText() + """
+        if (isLatex && latexTemplate != null) {
+            // For LaTeX export: Claude replaces only the [INSERT HERE: ...] placeholders.
+            // All LaTeX commands, formatting, and structure must remain byte-for-byte identical.
+            prompt = """
+                    You are an expert resume writer and LaTeX typesetter.
 
-                ---
-                TARGET JOB DESCRIPTION:
-                """ + request.getJobDescription()
-                + (skillAnswerContext.isEmpty() ? "" : """
+                    Your task is to fill in the LaTeX resume template below by replacing ONLY the
+                    [INSERT HERE: ...] placeholder values with the candidate's real information,
+                    tailored to the target job description.
 
-                ---
-                ADDITIONAL EXPERIENCE TO INCORPORATE (from candidate's answers to follow-up questions):
-                """ + skillAnswerContext);
+                    CRITICAL RULES — read carefully:
+                    1. Replace ONLY the text inside [INSERT HERE: ...] brackets. The replacement
+                       text goes in place of the entire bracket expression including the brackets.
+                    2. Do NOT modify any LaTeX commands, backslashes, braces, environments,
+                       or any text that is not inside an [INSERT HERE: ...] bracket.
+                    3. Tailor the content for the job: incorporate keywords from the job description,
+                       quantify achievements, use strong action verbs. Do NOT invent experience.
+                    4. If the candidate's resume does NOT have data for a section
+                       (e.g., no projects, no second job, no awards), remove that entire
+                       section block — including its \\section{}, \\resumeHeading, and
+                       \\resumeItemListStart...\\resumeItemListEnd — from the output.
+                    5. If a section has fewer items than the template (e.g., only 1 job instead
+                       of 3), remove the extra blocks for the missing items entirely.
+                    6. Escape these special LaTeX characters inside inserted text only:
+                       & → \\&   %  → \\%   $ → \\$   # → \\#   _ → \\_   ^ → \\^{}
+                    7. Output ONLY the complete LaTeX source file — no explanation, no markdown
+                       fences, no commentary before or after.
+
+                    ---
+                    LATEX TEMPLATE:
+                    """ + latexTemplate + """
+
+                    ---
+                    CANDIDATE'S RESUME:
+                    """ + request.getRawResumeText() + """
+
+                    ---
+                    TARGET JOB DESCRIPTION:
+                    """ + request.getJobDescription()
+                    + (skillAnswerContext.isEmpty() ? "" : """
+
+                    ---
+                    ADDITIONAL EXPERIENCE TO INCORPORATE (from candidate's answers to follow-up questions):
+                    """ + skillAnswerContext);
+
+        } else if (isDocx && docxTemplate != null) {
+            prompt = """
+        You are an expert resume writer.
+
+        Fill in the Word resume template below by replacing every [bracket placeholder]
+        with the candidate's real information, tailored to the job description.
+
+        CRITICAL RULES — violations will break the output:
+        1.  Return ONLY a valid JSON object. No explanation, no markdown fences, no text before or after.
+        2.  Each key must be the EXACT placeholder text including brackets,
+            e.g. "[Job Title 1]", "[GitHub URL]", "[City, State]".
+        3.  Each value is a plain string. No nested JSON, no extra brackets.
+        4.  NEVER leave a placeholder value as its template hint text (e.g. do not return
+            "[Job Title 1]" as a value — replace it with the actual job title).
+        5.  NEVER return an empty string "" for contact fields like [LinkedIn URL],
+            [GitHub URL], [Phone Number], [Professional Email], [City, State] —
+            always fill these from the candidate's resume. If truly missing, write "N/A".
+        6.  EVERY job slot must map to a DIFFERENT job from the candidate's resume.
+            Job 1, Job 2, Job 3, Job 4 must each be a unique role. NEVER repeat the
+            same company + title + date combination in more than one slot.
+        7.  Fill jobs in reverse chronological order (most recent = Job 1).
+        8.  If the candidate has fewer jobs than template slots, set ALL fields for the
+            unused slots to "" (title, company, city, dates, and all bullets).
+        9.  NEVER leave a section completely empty if the candidate has relevant data.
+            Projects, Skills, and Education must always be filled if data exists.
+        10. If a project slot has no matching project, set ALL its fields to "".
+            NEVER output a project heading with empty technology/github/demo fields
+            while leaving the description filled — either fill everything or empty everything.
+        11. NEVER output an empty bullet. If a bullet slot has no content, set it to "".
+        12. Tailor all content to the job description: use exact keywords, quantify
+            achievements, use strong action verbs. Do NOT invent experience.
+        13. CONTACT FIELDS — for each of these placeholders: [City, State], [Phone Number],
+                        [Professional Email], [LinkedIn URL], [GitHub URL]:
+                        - If the candidate's resume contains the information → fill it in.
+                        - If the candidate's resume does NOT contain the information → set the value to "REMOVE".
+                        The export pipeline will strip any token with value "REMOVE" from the output entirely,
+                        including the surrounding separator " | " so the contact line stays clean.
+        14. If a job has no meaningful bullet points to fill (e.g. a non-technical role with no
+                         relevant accomplishments for this job description), set ALL fields for that job slot
+                         to "" — title, company, city, dates, AND all bullets. Do not include a job heading
+                         with empty bullets. Either fill the whole slot or empty the whole slot.
+        
+         15. NEVER output any text that still contains [ or ] characters in the final result.
+             If a placeholder cannot be filled from the candidate's resume or job description,
+             set it to "" — never leave bracket text in the output.
+             16. The SKILLS & CERTIFICATIONS section has labeled bullet placeholders. You MUST
+                 preserve the label (e.g. "Languages:", "Frameworks & Libraries:", "Databases:")
+                 exactly as written in the template — only replace the bracketed value after the
+                 label. For example:
+                 "[Java | Python | SQL | JavaScript | etc.]" → "Python, C#, Java, TypeScript, SQL"
+                 Never remove or merge the skill category labels.
+             17. If a skill category has no matching data from the candidate's resume, set its
+                 placeholder value to "" so the entire bullet is removed by the cleanup pass.
+---
+        TEMPLATE PLACEHOLDERS (you must provide a value for every key below):
+        """ + docxTemplate + """
+
+        ---
+        CANDIDATE'S RESUME:
+        """ + request.getRawResumeText() + """
+
+        ---
+        TARGET JOB DESCRIPTION:
+        """ + request.getJobDescription()
+                    + (skillAnswerContext.isEmpty() ? "" : """
+
+        ---
+        ADDITIONAL EXPERIENCE:
+        """ + skillAnswerContext);
+    } else {
+            // For PDF (or DOCX/LaTeX without a template): generate plain text.
+            // If a LaTeX template exists, use it as a structural guide so the sections
+            // and ordering match what the user expects from their template.
+            String structureGuide = (latexTemplate != null)
+                    ? """
+
+                    **Structure Guide:**
+                    Use the section structure from this LaTeX template as your guide — maintain the same
+                    sections and ordering, but output plain text (ALL-CAPS section headers, no LaTeX commands):
+
+                    """ + latexTemplate
+                    : """
+
+                    **Output Format:**
+                    Return the complete resume as plain text with these section headers \
+                    (include only sections relevant to the candidate):
+                    CONTACT INFORMATION
+                    PROFESSIONAL SUMMARY
+                    SKILLS
+                    WORK EXPERIENCE
+                    EDUCATION
+                    PROJECTS (if applicable)
+                    CERTIFICATIONS (if applicable)
+                    """;
+
+            prompt = """
+                    You are an expert resume writer specializing in ATS (Applicant Tracking System) optimization.
+
+                    Rewrite the candidate's resume to be perfectly tailored for the target job.
+
+                    **Requirements:**
+                    - Incorporate exact keywords from the job description naturally (not keyword stuffing)
+                    - Lead with the most relevant experience for this specific role
+                    - Quantify every achievement with numbers, percentages, or scale where possible
+                    - Use strong action verbs: led, built, designed, increased, reduced, launched, etc.
+                    - Keep bullet points concise (1-2 lines each) and impactful
+                    - Do NOT invent experience — only work with what's provided
+                    - Maintain a professional, clean tone throughout
+                    """ + structureGuide + """
+
+                    ---
+                    CANDIDATE'S CURRENT RESUME:
+                    """ + request.getRawResumeText() + """
+
+                    ---
+                    TARGET JOB DESCRIPTION:
+                    """ + request.getJobDescription()
+                    + (skillAnswerContext.isEmpty() ? "" : """
+
+                    ---
+                    ADDITIONAL EXPERIENCE TO INCORPORATE (from candidate's answers to follow-up questions):
+                    """ + skillAnswerContext);
+        }
 
         String result = callClaude(prompt);
         log.info("Resume generation complete ({} chars)", result.length());
@@ -275,6 +449,52 @@ public class ClaudeService {
         return callClaude(prompt).trim();
     }
 
+    // ── Template Loading ─────────────────────────────────────────────────────
+
+    /**
+     * Reads the LaTeX resume template from the classpath.
+     * Returns null (and logs a warning) if the file is missing or unreadable.
+     */
+    private String loadLatexTemplate() {
+        try {
+            if (resumeLatexTemplateResource.exists()) {
+                String template = new String(
+                        resumeLatexTemplateResource.getInputStream().readAllBytes(),
+                        StandardCharsets.UTF_8);
+                log.debug("Loaded LaTeX resume template ({} chars)", template.length());
+                return template;
+            }
+        } catch (IOException e) {
+            log.warn("Could not load LaTeX resume template — falling back to default output: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Extracts plain text (including bracket placeholders) from the DOCX resume template.
+     * Uses Apache POI to iterate through every paragraph and concatenate their text.
+     * Returns null (and logs a warning) if the file is missing or unreadable.
+     */
+    private String loadDocxTemplateText() {
+        try {
+            if (resumeDocxTemplateResource.exists()) {
+                try (XWPFDocument doc = new XWPFDocument(resumeDocxTemplateResource.getInputStream())) {
+                    StringBuilder sb = new StringBuilder();
+                    for (XWPFParagraph para : doc.getParagraphs()) {
+                        String text = para.getText();
+                        sb.append(text).append("\n");
+                    }
+                    String template = sb.toString();
+                    log.debug("Loaded DOCX resume template ({} chars)", template.length());
+                    return template;
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Could not load DOCX resume template — falling back to default output: {}", e.getMessage());
+        }
+        return null;
+    }
+
     // ── Claude API ───────────────────────────────────────────────────────────
 
     /**
@@ -296,11 +516,15 @@ public class ClaudeService {
                         Map.of("role", "user", "content", userMessage)
                 )
         );
-
         Map<String, Object> response = claudeRestClient.post()
                 .uri("/v1/messages")
                 .body(requestBody)
                 .retrieve()
+                .onStatus(status -> status.isError(), (req, res) -> {
+                    String errorBody = new String(res.getBody().readAllBytes());
+                    log.error("Claude API error {}: {}", res.getStatusCode(), errorBody);
+                    throw new RuntimeException("Claude API error: " + res.getStatusCode() + " - " + errorBody);
+                })
                 .body(new ParameterizedTypeReference<>() {});
 
         if (response == null) {

@@ -115,9 +115,10 @@ public class JobAnalysisService {
     public List<SkillGap> compareToResume(String resume, List<SkillScore> skills) {
         log.debug("Comparing resume against {} skills", skills.size());
 
-        // Only check skills above the minimum relevance threshold to reduce noise
+        // Only check skills above the deal-breaker threshold — lower-scored skills
+        // are assumed to be coverable by transferable experience from the resume.
         List<SkillScore> significantSkills = skills.stream()
-                .filter(s -> s.getRelevanceScore() >= 0.4)
+                .filter(s -> s.getRelevanceScore() >= 0.8)
                 .collect(Collectors.toList());
 
         if (significantSkills.isEmpty()) {
@@ -134,14 +135,23 @@ public class JobAnalysisService {
 
         String prompt = """
                 Compare this candidate's resume against the required skills list.
-                Identify skills that are NOT clearly demonstrated in the resume.
+                Only flag a skill as missing if BOTH of these are true:
+                  1. The skill is not mentioned directly in the resume, AND
+                  2. There is NO transferable or adjacent experience that could reasonably substitute.
 
-                Use semantic matching — e.g., if the resume mentions "AWS Lambda" and "EC2",
-                consider "Cloud Computing" as covered even if not stated explicitly.
+                Be generous with transferable skills — if the candidate has worked with similar
+                tools, frameworks, or domains, treat the skill as covered. For example:
+                  - "AWS" covers "Cloud Computing", "Azure", or "GCP" at a general level
+                  - "React" covers "Frontend Development" or "JavaScript UI frameworks"
+                  - "Agile/Scrum" covers "Project Management" or "Team Collaboration"
+                  - Any leadership experience covers general "Team Leadership" requirements
+
+                Only return skills that are true deal-breakers: hard requirements with no
+                reasonable substitute visible anywhere in the resume.
 
                 Return ONLY a valid JSON array of skill name strings — no markdown, no explanation.
-                Example format: ["Kubernetes", "GraphQL", "Team Leadership"]
-                If no gaps are found, return an empty array: []
+                Example format: ["Kubernetes", "COBOL"]
+                If no hard gaps are found, return an empty array: []
 
                 Candidate Resume:
                 """ + resume + """

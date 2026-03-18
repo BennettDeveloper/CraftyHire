@@ -8,16 +8,19 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Formats and exports generated document content to downloadable file formats.
@@ -38,6 +41,12 @@ import java.util.List;
 @Slf4j
 @Service
 public class FileExportService {
+
+    @Value("classpath:templates/resumes/resume-docx-template.docx")
+    private Resource resumeDocxTemplate;
+
+    @Value("classpath:templates/coverletters/coverletter-docx-template.docx")
+    private Resource coverLetterDocxTemplate;
 
     // ── PDF Layout Constants ─────────────────────────────────────────────────
     private static final float PAGE_HEIGHT        = PDRectangle.A4.getHeight();
@@ -129,53 +138,152 @@ public class FileExportService {
         }
     }
 
-    /**
-     * Exports document content as a Word (.docx) byte array.
-     *
-     * ALL-CAPS lines are rendered as bold section headers with spacing above.
-     * Body lines use standard paragraph formatting.
-     *
-     * @param content      plain text document content from ClaudeService
-     * @param documentType "RESUME" or "COVER_LETTER"
-     * @return DOCX file as a byte array
-     */
     public byte[] exportToWord(String content, String documentType) throws IOException {
         log.debug("Exporting {} as DOCX ({} chars)", documentType, content.length());
 
-        try (XWPFDocument document = new XWPFDocument();
+        Resource template = "COVER_LETTER".equalsIgnoreCase(documentType)
+                ? coverLetterDocxTemplate
+                : resumeDocxTemplate;
+
+        // Parse Claude's JSON response into a placeholder map
+        Map<String, String> replacements = parsePlaceholderJson(content);
+
+        try (XWPFDocument document = openDocxTemplate(template);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-            for (String line : content.split("\n")) {
-                XWPFParagraph paragraph = document.createParagraph();
-
-                if (line.isBlank()) {
-                    // Empty paragraph adds vertical spacing between sections
-                    paragraph.setSpacingAfter(0);
-                    continue;
-                }
-
-                XWPFRun run = paragraph.createRun();
-                run.setFontFamily("Calibri");
-
-                if (isHeaderLine(line)) {
-                    // Style section headers: larger, bold, with space above
-                    run.setBold(true);
-                    run.setFontSize(13);
-                    paragraph.setSpacingBefore(240); // 12pt before header
-                    paragraph.setSpacingAfter(120);  // 6pt after header
-                } else {
-                    run.setFontSize(11);
-                    paragraph.setSpacingAfter(0);
-                    paragraph.setSpacingBefore(0);
-                }
-
-                run.setText(line);
+            // Replace placeholders in all paragraphs
+            for (XWPFParagraph para : document.getParagraphs()) {
+                replacePlaceholdersInParagraph(para, replacements);
             }
+
+            // Replace placeholders in tables (if template uses them)
+            for (XWPFTable table : document.getTables()) {
+                for (XWPFTableRow row : table.getRows()) {
+                    for (XWPFTableCell cell : row.getTableCells()) {
+                        for (XWPFParagraph para : cell.getParagraphs()) {
+                            replacePlaceholdersInParagraph(para, replacements);
+                        }
+                    }
+                }
+            }
+
+            // After all replacements, remove empty paragraphs that were
+            // placeholder-only bullets with no content
+            removeEmptyParagraphs(document);
 
             document.write(out);
             log.info("DOCX export complete: {} bytes", out.size());
             return out.toByteArray();
+
         }
+    }
+
+    private void removeEmptyParagraphs(XWPFDocument document) {
+        List<XWPFParagraph> toRemove = new ArrayList<>();
+
+        for (XWPFParagraph para : document.getParagraphs()) {
+            String text = para.getText().trim();
+
+            // ADD THIS DEBUG LOG
+            String stripped = text.replaceAll("[|\\-\\u2013\\u2014\\s]", "");
+            log.debug("Para: '{}' | stripped: '{}' | isBlank: {}", text, stripped, stripped.isBlank());
+
+            // 1. Fully blank
+            if (text.isBlank()) {
+                toRemove.add(para);
+                continue;
+            }
+
+            // 2. Unfilled [ ] placeholders still present
+            if (text.contains("[") && text.contains("]")) {
+                toRemove.add(para);
+                continue;
+            }
+
+            // 3. Orphaned separator-only lines — covers ASCII hyphen, en dash, em dash
+            if (stripped.isBlank()) {
+                toRemove.add(para);
+                continue;
+            }
+
+            // 4. Structural label lines with no actual values
+            String noLabels = text
+                    .replaceAll("(?i)technologies\\s*:", "")
+                    .replaceAll("(?i)github\\s*:", "")
+                    .replaceAll("(?i)live demo\\s*:", "")
+                    .replaceAll("(?i)languages\\s*:", "")
+                    .replaceAll("(?i)frameworks\\s*[&a-z]*\\s*:", "")
+                    .replaceAll("(?i)databases\\s*:", "")
+                    .replaceAll("(?i)tools\\s*[&a-z]*\\s*:", "")
+                    .replaceAll("(?i)methodologies\\s*:", "")
+                    .replaceAll("(?i)certifications\\s*:", "")
+                    .replaceAll("[|\\-\\u2013\\u2014\\s]", "");
+            if (noLabels.isBlank()) {
+                toRemove.add(para);
+            }
+        }
+
+        log.info("removeEmptyParagraphs removing {} paragraphs", toRemove.size());
+        for (int i = toRemove.size() - 1; i >= 0; i--) {
+            XWPFParagraph para = toRemove.get(i);
+            document.removeBodyElement(document.getPosOfParagraph(para));
+        }
+    }
+
+    private void replacePlaceholdersInParagraph(XWPFParagraph para,
+                                                Map<String, String> replacements) {
+        List<XWPFRun> runs = para.getRuns();
+        if (runs == null || runs.isEmpty()) return;
+
+        String fullText = runs.stream()
+                .map(r -> r.getText(0) == null ? "" : r.getText(0))
+                .collect(Collectors.joining());
+
+        for (Map.Entry<String, String> entry : replacements.entrySet()) {
+            fullText = fullText.replace(entry.getKey(), entry.getValue());
+        }
+
+        // Clean up any REMOVE sentinels and their surrounding " | " separators.
+        // Handles: "REMOVE  |  text", "text  |  REMOVE  |  text", "text  |  REMOVE"
+        fullText = fullText
+                .replaceAll("REMOVE\\s*\\|\\s*", "")   // REMOVE at start or middle
+                .replaceAll("\\s*\\|\\s*REMOVE", "")   // REMOVE at end
+                .replaceAll("^\\s*\\|\\s*", "")        // leading orphan separator
+                .replaceAll("\\s*\\|\\s*$", "")        // trailing orphan separator
+                .trim();
+
+        runs.get(0).setText(fullText, 0);
+        for (int i = 1; i < runs.size(); i++) {
+            runs.get(i).setText("", 0);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> parsePlaceholderJson(String content) {
+        try {
+            // Strip markdown fences if Claude wrapped the JSON
+            String cleaned = content
+                    .replaceAll("(?s)```json\\s*", "")
+                    .replaceAll("```", "")
+                    .trim();
+            return new ObjectMapper().readValue(cleaned, Map.class);
+        } catch (Exception e) {
+            log.error("Failed to parse Claude placeholder JSON: {}", e.getMessage());
+            throw new RuntimeException("Claude did not return valid placeholder JSON for DOCX export", e);
+        }
+    }
+
+    /**
+     * Opens a DOCX template from the classpath. Falls back to a blank document
+     * if the template is missing, so exports still work without a template file.
+     */
+    private XWPFDocument openDocxTemplate(Resource template) throws IOException {
+        if (template != null && template.exists()) {
+            log.debug("Loading DOCX template: {}", template.getFilename());
+            return new XWPFDocument(template.getInputStream());
+        }
+        log.warn("DOCX template not found — falling back to blank document");
+        return new XWPFDocument();
     }
 
     /**
@@ -193,7 +301,14 @@ public class FileExportService {
      */
     public byte[] exportToLatex(String content, String documentType) {
         log.debug("Exporting {} as LaTeX ({} chars)", documentType, content.length());
-        String latex = buildLatexDocument(content, documentType);
+
+        // If Claude already produced a complete LaTeX document (i.e. the resume was
+        // generated with the user's own template), pass it through unchanged.
+        // Otherwise wrap the plain-text content in the built-in article template.
+        String latex = content.trim().startsWith("\\documentclass")
+                ? content
+                : buildLatexDocument(content, documentType);
+
         log.info("LaTeX export complete: {} bytes", latex.length());
         return latex.getBytes(StandardCharsets.UTF_8);
     }

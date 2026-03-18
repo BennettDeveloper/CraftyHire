@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,8 +35,12 @@ public class AdaptiveQuestionService {
     private final ClaudeService claudeService;
 
     // Only generate questions for skills above this importance threshold.
-    // Gaps below this level are too minor to ask about.
-    private static final double QUESTION_RELEVANCE_THRESHOLD = 0.4;
+    // Everything below is treated as coverable by transferable experience and skipped.
+    private static final double QUESTION_RELEVANCE_THRESHOLD = 0.8;
+
+    // The top N gaps (by relevance) receive an open-ended written response question.
+    // Everything below this rank gets a Yes/No question to keep friction low.
+    private static final int MAX_OPEN_ENDED_QUESTIONS = 3;
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -59,21 +64,31 @@ public class AdaptiveQuestionService {
             return List.of();
         }
 
-        List<Question> questions = gaps.stream()
+        // Sort all gaps by importance so the most critical are asked first
+        List<SkillGap> filtered = gaps.stream()
                 .filter(gap -> !gap.isResolved())
                 .filter(gap -> gap.getRelevanceScore() >= QUESTION_RELEVANCE_THRESHOLD)
                 .sorted(Comparator.comparingDouble(SkillGap::getRelevanceScore).reversed())
-                .map(gap -> {
-                    String questionText = claudeService.askFollowUpQuestion(gap);
-                    return Question.builder()
-                            .skillName(gap.getSkillName())
-                            .questionText(questionText)
-                            .questionType(determineQuestionType(gap))
-                            .build();
-                })
                 .collect(Collectors.toList());
 
-        log.info("Generated {} follow-up questions for {} skill gaps", questions.size(), gaps.size());
+        List<Question> questions = new ArrayList<>();
+        for (int i = 0; i < filtered.size(); i++) {
+            SkillGap gap = filtered.get(i);
+            // Top MAX_OPEN_ENDED_QUESTIONS gaps (highest relevance) get a written response
+            // question for rich context. Everything below that rank gets Yes/No to keep
+            // the flow quick — a simple confirmation is enough for lower-priority skills.
+            String questionType = i < MAX_OPEN_ENDED_QUESTIONS ? "OPEN_ENDED" : "YES_NO";
+            String questionText = claudeService.askFollowUpQuestion(gap);
+            questions.add(Question.builder()
+                    .skillName(gap.getSkillName())
+                    .questionText(questionText)
+                    .questionType(questionType)
+                    .build());
+        }
+
+        long openEndedCount = questions.stream().filter(q -> "OPEN_ENDED".equals(q.getQuestionType())).count();
+        log.info("Generated {} follow-up questions ({} open-ended, {} yes/no) for {} skill gaps",
+                questions.size(), openEndedCount, questions.size() - openEndedCount, gaps.size());
         return questions;
     }
 
@@ -125,19 +140,6 @@ public class AdaptiveQuestionService {
     }
 
     // ── Private Helpers ──────────────────────────────────────────────────────
-
-    /**
-     * Determines the question type based on the skill's relevance score.
-     *
-     * High-importance skills (>= 70%) get OPEN_ENDED questions — the candidate
-     * should explain their experience in detail so Claude has rich context.
-     *
-     * Lower-importance skills get YES_NO questions — a simple confirmation
-     * is enough context for Claude to handle the gap gracefully.
-     */
-    private String determineQuestionType(SkillGap gap) {
-        return gap.getRelevanceScore() >= 0.7 ? "OPEN_ENDED" : "YES_NO";
-    }
 
     /**
      * Makes a best-effort determination of whether the answer describes

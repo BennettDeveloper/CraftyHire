@@ -1,0 +1,227 @@
+\documentclass[letterpaper,10pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Section formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[2]{
+  \item\small{
+    \textbf{#1}{: #2 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeHeading}[4]{
+    \begin{tabular*}{0.99\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-5pt}
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-1pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-5pt}
+}
+
+\newcommand{\resumeSubItem}[2]{\resumeItem{#1}{#2}\vspace{-4pt}}
+
+\renewcommand{\labelitemii}{$\circ$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=*]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%----------HEADING-----------------
+\begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+  \textbf{\Large [INSERT HERE: Full Name]} & \href{https://[INSERT HERE: yourwebsite.com]}{Website: [INSERT HERE: yourwebsite.com]} \\
+  Email: \href{mailto:[INSERT HERE: youremail@example.com]}{[INSERT HERE: youremail@example.com]} & GitHub: \href{https://github.com/[INSERT HERE: yourusername]}{@[INSERT HERE: yourusername]} \\
+  Phone: [INSERT HERE: 000-000-0000] & LinkedIn: \href{https://linkedin.com/in/[INSERT HERE: yourprofile]}{linkedin.com/in/[INSERT HERE: yourprofile]} \\
+\end{tabular*}
+\vspace{-8pt}
+
+%-------OBJECTIVE----------------
+\section{Objective}
+\resumeItemListStart
+  \vspace{2pt}
+  \item[]\small{[INSERT HERE: Write 1-2 sentences about your role, experience, and what you are seeking.]}
+  \vspace{-4pt}
+\resumeItemListEnd
+\vspace{3pt}
+
+%--------SKILLS------------
+\section{Skills}
+\begin{description}
+  \item\small{\textbf{Languages:} [INSERT HERE: Language 1, Language 2, Language 3]}
+  \vspace{-5pt}
+  \item\small{\textbf{Frameworks / Libraries:} [INSERT HERE: Framework 1, Framework 2, Framework 3]}
+  \vspace{-5pt}
+  \item\small{\textbf{Databases:} [INSERT HERE: Database 1, Database 2]}
+  \vspace{-5pt}
+  \item\small{\textbf{Tools / Platforms:} [INSERT HERE: Tool 1, Tool 2, Tool 3]}
+  \vspace{-5pt}
+  \item\small{\textbf{Methodologies:} [INSERT HERE: Methodology 1, Methodology 2]}
+  \vspace{-5pt}
+  \item\small{\textbf{Professional Skills:} [INSERT HERE: Skill 1, Skill 2, Skill 3]}
+\end{description}
+
+%-----------EXPERIENCE-----------------
+\section{Experience}
+
+  % Job 1 (Most Recent)
+  \resumeHeading
+    {[INSERT HERE: Company Name]}{[INSERT HERE: City, State]}
+    {[INSERT HERE: Job Title]}{[INSERT HERE: Month Year] -- [INSERT HERE: Month Year or current]}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{[INSERT HERE: Achievement or responsibility. Start with an action verb and quantify impact where possible.]}
+    \vspace{-4pt}
+    \item\small{[INSERT HERE: Achievement or responsibility.]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+  \vspace{5pt}
+
+  % Job 2
+  \resumeHeading
+    {[INSERT HERE: Company Name]}{[INSERT HERE: City, State]}
+    {[INSERT HERE: Job Title]}{[INSERT HERE: Month Year] -- [INSERT HERE: Month Year]}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{[INSERT HERE: Achievement or responsibility.]}
+    \vspace{-4pt}
+    \item\small{[INSERT HERE: Achievement or responsibility.]}
+    \vspace{-4pt}
+    \item\small{[INSERT HERE: Achievement or responsibility.]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+  \vspace{5pt}
+
+  % Job 3
+  \resumeHeading
+    {[INSERT HERE: Company Name]}{[INSERT HERE: City, State]}
+    {[INSERT HERE: Job Title]}{[INSERT HERE: Month Year] -- [INSERT HERE: Month Year]}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{[INSERT HERE: Achievement or responsibility.]}
+    \vspace{-4pt}
+    \item\small{[INSERT HERE: Achievement or responsibility.]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+%-----------PROJECTS-----------------
+\vspace{4pt}
+\section{Projects}
+
+  % Project 1
+  \resumeHeading
+    {[INSERT HERE: Project Name]}{\small\href{https://[INSERT HERE: projecturl.com]}{[INSERT HERE: projecturl.com]}}
+    {[INSERT HERE: Brief Project Description]}{}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{[INSERT HERE: What does this project do? What problem does it solve? What tech did you use?]}
+    \vspace{-4pt}
+    \item\small{[INSERT HERE: Notable features, impact, or metrics.]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+  \vspace{4pt}
+
+  % Project 2
+  \resumeHeading
+    {[INSERT HERE: Project Name]}{\small\href{https://[INSERT HERE: projecturl.com]}{[INSERT HERE: projecturl.com]}}
+    {[INSERT HERE: Brief Project Description]}{}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{[INSERT HERE: What does this project do? What tech did you use?]}
+    \vspace{-4pt}
+    \item\small{[INSERT HERE: Notable features or outcomes.]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+%-----------EDUCATION-----------------
+\vspace{-5pt}
+\section{Education}
+
+  % School 1
+  \resumeHeading
+    {[INSERT HERE: University / Institution Name]}{[INSERT HERE: City, State]}
+    {[INSERT HERE: Degree, Major]}{[INSERT HERE: Month Year] -- [INSERT HERE: Month Year]}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{\textbf{GPA:} [INSERT HERE: X.XX / 4.00]}
+    \vspace{-4pt}
+    \item\small{\textbf{Relevant Coursework:} [INSERT HERE: Course 1, Course 2, Course 3]}
+    \vspace{-4pt}
+    \item\small{\textbf{Clubs / Activities:} [INSERT HERE: Club or organization name]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+  \vspace{5pt}
+
+  % School 2 (optional -- e.g., bootcamp, certification, second degree)
+  \resumeHeading
+    {[INSERT HERE: Bootcamp / Certification Program]}{[INSERT HERE: City, State]}
+    {[INSERT HERE: Program Name]}{[INSERT HERE: Month Year] -- [INSERT HERE: Month Year]}
+  \resumeItemListStart
+    \vspace{2pt}
+    \item\small{[INSERT HERE: Brief description of program focus and skills gained.]}
+    \vspace{-4pt}
+  \resumeItemListEnd
+
+%-----------HONORS & AWARDS-----------------
+\vspace{-5pt}
+\section{Honors \& Awards}
+\resumeItemListStart
+  \item\small{\href{https://[INSERT HERE: awardurl.com]}{[INSERT HERE: Award Name -- Issuing Organization (Year)]}}
+  \vspace{-5pt}
+  \item\small{[INSERT HERE: Another Award or Honor -- Issuing Organization (Year)]}
+  \vspace{-5pt}
+\resumeItemListEnd
+
+%-------------------------------------------
+\end{document}
