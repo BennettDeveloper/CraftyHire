@@ -37,15 +37,22 @@ export default function DocumentResult({
 
   const active = activeTab === 'RESUME' ? resume : coverLetter;
 
+  // Strip markdown code fences that Claude sometimes wraps around JSON
+  function stripCodeFence(content: string): string {
+    return content.replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/, '').trim();
+  }
+
   // The "Edit Resume" button is only meaningful when viewing a DOCX-mode resume
-  // (content is a JSON placeholder map, indicated by starting with "{")
-  const resumeIsJsonMap = resume?.content.trimStart().startsWith('{') ?? false;
+  // (content is a JSON placeholder map, possibly wrapped in a markdown code fence)
+  const resumeRawContent = resume?.content ?? '';
+  const resumeStripped = stripCodeFence(resumeRawContent);
+  const resumeIsJsonMap = resumeStripped.startsWith('{');
 
   function handleOpenEditor() {
     if (!resume) return;
     setParseError(null);
     try {
-      const map = JSON.parse(resume.content) as Record<string, string>;
+      const map = JSON.parse(resumeStripped) as Record<string, string>;
       setParsedMap(map);
       setEditorOpen(true);
     } catch {
@@ -74,7 +81,7 @@ export default function DocumentResult({
     setDownloadError(null);
     setDownloading(format);
     try {
-      await exportDocument(active.content, format, activeTab);
+      await exportDocument(stripCodeFence(active.content), format, activeTab);
     } catch (e) {
       setDownloadError(e instanceof ApiError ? e.message : 'Download failed.');
     } finally {
