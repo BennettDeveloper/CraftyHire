@@ -992,6 +992,170 @@
   vertical-align: middle;
 }
 
+/* ─── Editor — drag handle & sortable entries ────────────────────────────── */
+
+.editor-group--sortable {
+  position: relative;
+}
+
+.editor-group__drag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.editor-group__drag-row .editor-group__label {
+  margin: 0;
+  flex: 1;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: grab;
+  border-radius: 4px;
+  padding: 0;
+  flex-shrink: 0;
+  touch-action: none;
+}
+.drag-handle:hover {
+  background: var(--color-orange-light);
+  color: var(--color-orange);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Delete button (trash icon) */
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-icon--delete {
+  color: #aaa;
+}
+.btn-icon--delete:hover {
+  background: #fdecea;
+  color: #d32f2f;
+}
+
+/* Add entry button — dashed full-width */
+.btn--add-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0;
+  border: 1.5px dashed var(--color-orange-mid);
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-orange);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn--add-entry:hover {
+  background: var(--color-orange-light);
+}
+
+/* ─── Editor — footer (Save + Download side by side) ─────────────────────── */
+
+.resume-editor__footer {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--color-orange-light);
+  margin-top: 1rem;
+}
+
+.btn--half {
+  flex: 1;
+}
+
+/* ─── Editor — Websites field pairs ──────────────────────────────────────── */
+
+.editor-group__fields--websites {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.website-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+/* ─── Editor — close confirmation dialog ─────────────────────────────────── */
+
+.editor-close-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255 255 255 / 0.85);
+  backdrop-filter: blur(2px);
+  border-radius: var(--radius-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.editor-close-dialog {
+  background: #fff;
+  border: 1px solid var(--color-orange-mid);
+  border-radius: var(--radius-card);
+  padding: 1.5rem;
+  max-width: 340px;
+  width: 90%;
+  box-shadow: 0 8px 24px rgba(0 0 0 / 0.12);
+}
+
+.editor-close-dialog__msg {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  margin: 0 0 1.1rem;
+  text-align: center;
+}
+
+.editor-close-dialog__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ─── Resume Preview — unsaved indicator ─────────────────────────────────── */
+
+.resume-preview-box--unsaved {
+  border-color: var(--color-orange);
+}
+
+.preview-unsaved-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--color-orange);
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
 /* ─── Resume Preview ─────────────────────────────────────────────────────── */
 
 /* Scrollable wrapper that replaces the raw-JSON textarea */

@@ -62,14 +62,22 @@ const SKILL_ROWS = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ResumePreview({ map }: ResumePreviewProps) {
-  // Header
-  const name     = get(map, '[FIRST AND LAST NAME]');
-  const city     = get(map, '[City, State]');
-  const phone    = get(map, '[Phone Number]');
-  const email    = get(map, '[Professional Email]');
-  const linkedin = get(map, '[LinkedIn URL]');
-  const github   = get(map, '[GitHub URL]');
-  const contactParts = [city, phone, email, linkedin, github].filter(ok);
+  // Header — resolve display label (if set) or fall back to raw URL
+  function contactDisplay(urlKey: string): string {
+    const labelKey = urlKey.slice(0, -1) + ' Label]'; // e.g. "[LinkedIn URL Label]"
+    const label = get(map, labelKey);
+    return label || get(map, urlKey);
+  }
+
+  const name    = get(map, '[FIRST AND LAST NAME]');
+  const city    = get(map, '[City, State]');
+  const phone   = get(map, '[Phone Number]');
+  const email   = get(map, '[Professional Email]');
+  const linkedin = contactDisplay('[LinkedIn URL]');
+  const github   = contactDisplay('[GitHub URL]');
+  const website  = contactDisplay('[Website URL]');
+  const other    = contactDisplay('[Other URL]');
+  const contactParts = [city, phone, email, linkedin, github, website, other].filter(ok);
 
   // Professional Summary
   const summary = getByPrefix(map, '[Professional Summary:');

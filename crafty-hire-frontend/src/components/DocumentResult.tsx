@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { GenerateDocumentResponse, ExportFormat, DocumentType } from '../types';
 import { exportDocument } from '../api/export';
 import { ApiError } from '../api/client';
@@ -12,90 +12,120 @@ interface DocumentResultProps {
   generating: boolean;
 }
 
+function stripCodeFence(content: string): string {
+  return content.replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/, '').trim();
+}
+
 export default function DocumentResult({
   resume,
   coverLetter,
   onRegenerate,
   generating,
 }: DocumentResultProps) {
-  const [activeTab, setActiveTab] = useState<DocumentType>(resume ? 'RESUME' : 'COVER_LETTER');
+  const [activeTab,     setActiveTab]     = useState<DocumentType>(resume ? 'RESUME' : 'COVER_LETTER');
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<ExportFormat | null>(null);
+  const [downloading,   setDownloading]   = useState<ExportFormat | null>(null);
 
-  // ── Editor state ────────────────────────────────────────────────────────────
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorDirty, setEditorDirty] = useState(false);
-  const [parsedMap, setParsedMap] = useState<Record<string, string> | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
+  // ── Editor / live-sync state ───────────────────────────────────────────────
+  const [editorOpen,   setEditorOpen]   = useState(false);
+  const [editorDirty,  setEditorDirty]  = useState(false);
+  const [parseError,   setParseError]   = useState<string | null>(null);
 
-  // Reset editor whenever a new resume is generated
-  useEffect(() => {
-    setEditorOpen(false);
-    setEditorDirty(false);
-    setParsedMap(null);
-    setParseError(null);
-  }, [resume]);
+  // committedMap: last explicitly saved state (or initial parsed map once available)
+  const [committedMap, setCommittedMap] = useState<Record<string, string> | null>(null);
+  // liveMap: real-time editor values (null when editor is closed)
+  const [liveMap,      setLiveMap]      = useState<Record<string, string> | null>(null);
 
-  const active = activeTab === 'RESUME' ? resume : coverLetter;
-
-  // Strip markdown code fences that Claude sometimes wraps around JSON
-  function stripCodeFence(content: string): string {
-    return content.replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/, '').trim();
-  }
-
-  // The "Edit Resume" button is only meaningful when viewing a DOCX-mode resume
-  // (content is a JSON placeholder map, possibly wrapped in a markdown code fence)
+  // Parse the raw resume content once
   const resumeRawContent = resume?.content ?? '';
-  const resumeStripped = stripCodeFence(resumeRawContent);
-  const resumeIsJsonMap = resumeStripped.startsWith('{');
+  const resumeStripped   = stripCodeFence(resumeRawContent);
+  const resumeIsJsonMap  = resumeStripped.startsWith('{');
 
-  // Parse the map once for the preview (display-only — does not mutate source data)
-  const previewMap = useMemo((): Record<string, string> | null => {
+  const initialParsedMap = useMemo((): Record<string, string> | null => {
     if (!resumeIsJsonMap) return null;
     try { return JSON.parse(resumeStripped) as Record<string, string>; }
     catch { return null; }
   }, [resumeStripped, resumeIsJsonMap]);
 
-  function handleOpenEditor() {
-    if (!resume) return;
+  // When a new resume arrives, seed committedMap from the parsed content and reset editor
+  useEffect(() => {
+    setEditorOpen(false);
+    setEditorDirty(false);
+    setLiveMap(null);
     setParseError(null);
-    try {
-      const map = JSON.parse(resumeStripped) as Record<string, string>;
-      setParsedMap(map);
-      setEditorOpen(true);
-    } catch {
-      setParseError('Could not parse resume data for editing. The content may not be in the expected format.');
+    setCommittedMap(initialParsedMap);
+  }, [resume]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const active = activeTab === 'RESUME' ? resume : coverLetter;
+
+  // The map shown in the preview:
+  // - When editor is open: liveMap (real-time) falling back to committedMap
+  // - When editor is closed: committedMap falling back to the initial parsed map
+  const previewMap = editorOpen
+    ? (liveMap ?? committedMap ?? initialParsedMap)
+    : (committedMap ?? initialParsedMap);
+
+  // ── Editor handlers ────────────────────────────────────────────────────────
+
+  function handleOpenEditor() {
+    if (!resumeIsJsonMap) return;
+    if (!committedMap && !initialParsedMap) {
+      setParseError('Could not parse resume data for editing.');
+      return;
     }
+    setParseError(null);
+    setLiveMap(committedMap ?? initialParsedMap);
+    setEditorOpen(true);
   }
 
   function handleCloseEditor() {
     setEditorOpen(false);
+    setLiveMap(null);
   }
+
+  // Called by editor on every keystroke / reorder / add / delete
+  const handleLiveUpdate = useCallback((map: Record<string, string>) => {
+    setLiveMap(map);
+  }, []);
+
+  // Called when user clicks "Save Changes" in the editor
+  const handleSave = useCallback((map: Record<string, string>) => {
+    setCommittedMap(map);
+    setEditorDirty(false);
+  }, []);
 
   function handleRegenerate() {
     if (editorOpen && editorDirty) {
-      const confirmed = window.confirm(
-        'You have unsaved edits. Regenerating will discard them. Continue?'
-      );
+      const confirmed = window.confirm('You have unsaved edits. Regenerating will discard them. Continue?');
       if (!confirmed) return;
     }
     setEditorOpen(false);
     setEditorDirty(false);
+    setLiveMap(null);
     onRegenerate();
   }
+
+  // ── Download ───────────────────────────────────────────────────────────────
+  // Uses committedMap (for resume JSON) so saved edits are reflected in downloads
 
   async function handleDownload(format: ExportFormat) {
     if (!active) return;
     setDownloadError(null);
     setDownloading(format);
     try {
-      await exportDocument(stripCodeFence(active.content), format, activeTab);
+      // If resume has been edited, use committedMap; otherwise use raw content
+      const content = (activeTab === 'RESUME' && committedMap)
+        ? JSON.stringify(committedMap)
+        : stripCodeFence(active.content);
+      await exportDocument(content, format, activeTab);
     } catch (e) {
       setDownloadError(e instanceof ApiError ? e.message : 'Download failed.');
     } finally {
       setDownloading(null);
     }
   }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -130,8 +160,12 @@ export default function DocumentResult({
 
         {active && (
           <>
+            {/* Resume JSON map → formatted preview; everything else → raw textarea */}
             {activeTab === 'RESUME' && previewMap ? (
-              <div className="resume-preview-box">
+              <div className={`resume-preview-box${editorOpen && editorDirty ? ' resume-preview-box--unsaved' : ''}`}>
+                {editorOpen && editorDirty && (
+                  <div className="preview-unsaved-badge" aria-live="polite">&#8226; Unsaved changes</div>
+                )}
                 <ResumePreview map={previewMap} />
               </div>
             ) : (
@@ -144,13 +178,13 @@ export default function DocumentResult({
             )}
 
             {downloadError && <p className="field-error">{downloadError}</p>}
-            {parseError && <p className="field-error">{parseError}</p>}
+            {parseError    && <p className="field-error">{parseError}</p>}
 
             <div className="export-row">
               {(activeTab === 'RESUME'
                 ? (['DOCX', 'LATEX'] as ExportFormat[])
-                : (['DOCX'] as ExportFormat[])
-              ).map((fmt) => (
+                : (['DOCX']          as ExportFormat[])
+              ).map(fmt => (
                 <button
                   key={fmt}
                   className="btn btn--export"
@@ -162,7 +196,7 @@ export default function DocumentResult({
               ))}
             </div>
 
-            {/* Edit Resume — only shown when viewing a DOCX JSON-map resume */}
+            {/* Edit Resume button — only for DOCX JSON-map resumes */}
             {activeTab === 'RESUME' && resumeIsJsonMap && (
               <button
                 className={`btn btn--full${editorOpen ? ' btn--edit-active' : ' btn--secondary'}`}
@@ -183,7 +217,7 @@ export default function DocumentResult({
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                     </svg>
                     Edit Resume
-                    {editorDirty && <span className="edit-dirty-dot" aria-label="Unsaved edits" />}
+                    {editorDirty && !editorOpen && <span className="edit-dirty-dot" aria-label="Unsaved edits" />}
                   </>
                 )}
               </button>
@@ -201,10 +235,12 @@ export default function DocumentResult({
         )}
       </div>
 
-      {/* Inline editor — renders below the results card, not in a modal */}
-      {editorOpen && parsedMap && (
+      {/* Inline editor — renders below the results card */}
+      {editorOpen && (committedMap ?? initialParsedMap) && (
         <ResumeEditor
-          initialMap={parsedMap}
+          initialMap={(committedMap ?? initialParsedMap)!}
+          onLiveUpdate={handleLiveUpdate}
+          onSave={handleSave}
           onClose={handleCloseEditor}
           onDirtyChange={setEditorDirty}
         />
