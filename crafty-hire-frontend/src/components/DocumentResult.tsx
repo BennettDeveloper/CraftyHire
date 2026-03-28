@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { GenerateDocumentResponse, ExportFormat, DocumentType } from '../types';
 import { exportDocument } from '../api/export';
 import { ApiError } from '../api/client';
 import ResumeEditor from './ResumeEditor';
+import ResumePreview from './ResumePreview';
 
 interface DocumentResultProps {
   resume: GenerateDocumentResponse | null;
@@ -47,6 +48,13 @@ export default function DocumentResult({
   const resumeRawContent = resume?.content ?? '';
   const resumeStripped = stripCodeFence(resumeRawContent);
   const resumeIsJsonMap = resumeStripped.startsWith('{');
+
+  // Parse the map once for the preview (display-only — does not mutate source data)
+  const previewMap = useMemo((): Record<string, string> | null => {
+    if (!resumeIsJsonMap) return null;
+    try { return JSON.parse(resumeStripped) as Record<string, string>; }
+    catch { return null; }
+  }, [resumeStripped, resumeIsJsonMap]);
 
   function handleOpenEditor() {
     if (!resume) return;
@@ -122,12 +130,18 @@ export default function DocumentResult({
 
         {active && (
           <>
-            <textarea
-              className="textarea textarea--preview"
-              readOnly
-              value={active.content}
-              rows={14}
-            />
+            {activeTab === 'RESUME' && previewMap ? (
+              <div className="resume-preview-box">
+                <ResumePreview map={previewMap} />
+              </div>
+            ) : (
+              <textarea
+                className="textarea textarea--preview"
+                readOnly
+                value={active.content}
+                rows={14}
+              />
+            )}
 
             {downloadError && <p className="field-error">{downloadError}</p>}
             {parseError && <p className="field-error">{parseError}</p>}
