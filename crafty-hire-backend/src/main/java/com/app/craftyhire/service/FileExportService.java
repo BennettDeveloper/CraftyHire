@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -167,6 +168,9 @@ public class FileExportService {
                 }
             }
 
+            // Reduce font size if content is too long to fit one page
+            compressToOnePage(document);
+
             // After all replacements, remove empty paragraphs that were
             // placeholder-only bullets with no content
             removeEmptyParagraphs(document);
@@ -221,6 +225,22 @@ public class FileExportService {
             if (noLabels.isBlank()) {
                 toRemove.add(para);
             }
+
+            // 5. Job heading lines where location or dates are empty
+            // Catches patterns like "Job Title  |    |    |   –" or "Title  |  Company  |    |"
+            // Split on | and check if any segment (after the first) is blank
+            String[] segments = text.split("\\|");
+            if (segments.length >= 3) {
+                long emptySegments = Arrays.stream(segments)
+                        .skip(1) // skip the job title itself
+                        .map(String::trim)
+                        .filter(s -> s.isBlank() || s.equals("–") || s.equals("-") || s.equals("—"))
+                        .count();
+                if (emptySegments >= 2) {
+                    toRemove.add(para);
+                    continue;
+                }
+            }
         }
 
         log.info("removeEmptyParagraphs removing {} paragraphs", toRemove.size());
@@ -235,26 +255,74 @@ public class FileExportService {
         List<XWPFRun> runs = para.getRuns();
         if (runs == null || runs.isEmpty()) return;
 
+        // Reconstruct full paragraph text across all runs
         String fullText = runs.stream()
                 .map(r -> r.getText(0) == null ? "" : r.getText(0))
                 .collect(Collectors.joining());
 
+        // Only process paragraphs that actually contain placeholders
+        if (!fullText.contains("[") || !fullText.contains("]")) return;
+
+        // Replace all placeholders with their values
+        String replaced = fullText;
         for (Map.Entry<String, String> entry : replacements.entrySet()) {
-            fullText = fullText.replace(entry.getKey(), entry.getValue());
+            replaced = replaced.replace(entry.getKey(), entry.getValue());
         }
 
-        // Clean up any REMOVE sentinels and their surrounding " | " separators.
-        // Handles: "REMOVE  |  text", "text  |  REMOVE  |  text", "text  |  REMOVE"
-        fullText = fullText
+        // Clean up REMOVE sentinels and their surrounding " | " separators.
+        // Order matters — handle middle cases before edge cases.
+        replaced = replaced
                 .replaceAll("REMOVE\\s*\\|\\s*", "")   // REMOVE at start or middle
                 .replaceAll("\\s*\\|\\s*REMOVE", "")   // REMOVE at end
-                .replaceAll("^\\s*\\|\\s*", "")        // leading orphan separator
-                .replaceAll("\\s*\\|\\s*$", "")        // trailing orphan separator
+                .replaceAll("^\\s*\\|\\s*", "")        // orphaned leading separator
+                .replaceAll("\\s*\\|\\s*$", "")        // orphaned trailing separator
                 .trim();
 
-        runs.get(0).setText(fullText, 0);
+        // Write merged result into first run, blank out the rest.
+        // This preserves the first run's font/size/bold/color styling.
+        runs.get(0).setText(replaced, 0);
         for (int i = 1; i < runs.size(); i++) {
             runs.get(i).setText("", 0);
+        }
+    }
+
+    private void compressToOnePage(XWPFDocument document) {
+        // Rough character count heuristic — a single page at 11pt Calibri
+        // with 0.7" margins fits approximately 3500-4000 characters.
+        String fullText = document.getParagraphs().stream()
+                .map(XWPFParagraph::getText)
+                .collect(Collectors.joining());
+
+        int length = fullText.length();
+        log.debug("Document length for page compression: {} chars", length);
+
+        // Only compress if content is likely overflowing one page
+        if (length < 3800) return;
+
+        // Determine reduced font size based on how much content there is
+        int bodySize;    // in half-points (POI uses half-points)
+        int headerSize;
+
+        if (length < 4400) {
+            bodySize = 18;   // 9pt
+            headerSize = 20; // 10pt
+        } else {
+            bodySize = 16;   // 8pt
+            headerSize = 18; // 9pt
+        }
+
+        log.info("Compressing document to one page — body: {}pt, headers: {}pt",
+                bodySize / 2, headerSize / 2);
+
+        for (XWPFParagraph para : document.getParagraphs()) {
+            for (XWPFRun run : para.getRuns()) {
+                // Only shrink runs that have explicit font sizes set
+                // (leave unstyled runs alone to avoid breaking template formatting)
+                if (run.getFontSize() > 0) {
+                    boolean isHeader = run.isBold() && run.getFontSize() >= 11;
+                    run.setFontSize(isHeader ? headerSize / 2 : bodySize / 2);
+                }
+            }
         }
     }
 

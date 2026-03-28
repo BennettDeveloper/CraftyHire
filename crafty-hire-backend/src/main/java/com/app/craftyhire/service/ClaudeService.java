@@ -67,6 +67,14 @@ public class ClaudeService {
     @Value("classpath:templates/resumes/resume-docx-template.docx")
     private Resource resumeDocxTemplateResource;
 
+    /**
+     * Optional DOCX cover letter template loaded from the classpath.
+     * Bracketed placeholders (e.g. [Your Full Name]) are filled in by Claude.
+     * If absent, the service falls back to its built-in plain-text output.
+     */
+    @Value("classpath:templates/coverletters/coverletter-docx-template.docx")
+    private Resource coverLetterDocxTemplateResource;
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /**
@@ -75,6 +83,8 @@ public class ClaudeService {
      * Used as an initial step when the user pastes a job description.
      * The response provides context that helps the user understand what
      * the employer is looking for before their resume is tailored.
+     *
+     * This is the %'s prompt call
      *
      * @param jobDescription the raw job posting text
      * @return a structured analysis covering responsibilities, qualifications, and ATS keywords
@@ -227,22 +237,96 @@ public class ClaudeService {
                         - If the candidate's resume does NOT contain the information → set the value to "REMOVE".
                         The export pipeline will strip any token with value "REMOVE" from the output entirely,
                         including the surrounding separator " | " so the contact line stays clean.
-        14. If a job has no meaningful bullet points to fill (e.g. a non-technical role with no
-                         relevant accomplishments for this job description), set ALL fields for that job slot
-                         to "" — title, company, city, dates, AND all bullets. Do not include a job heading
-                         with empty bullets. Either fill the whole slot or empty the whole slot.
-        
-         15. NEVER output any text that still contains [ or ] characters in the final result.
+        14. If a job slot has no directly relevant technical bullet points for the target role,
+                                DO NOT omit the job — instead write 2-3 bullets focused on TRANSFERABLE SKILLS
+                                such as leadership, communication, customer service, teamwork, problem-solving,
+                                attention to detail, and operational excellence. Every job the candidate has held
+                                must appear in the resume. A job entry should only be set to "" if the template
+                                has more slots than the candidate has jobs.
+                                A heading with any empty fields must not appear in the output.
+        15. NEVER output any text that still contains [ or ] characters in the final result.
              If a placeholder cannot be filled from the candidate's resume or job description,
              set it to "" — never leave bracket text in the output.
-             16. The SKILLS & CERTIFICATIONS section has labeled bullet placeholders. You MUST
+        16. The SKILLS & CERTIFICATIONS section has labeled bullet placeholders. You MUST
                  preserve the label (e.g. "Languages:", "Frameworks & Libraries:", "Databases:")
                  exactly as written in the template — only replace the bracketed value after the
                  label. For example:
                  "[Java | Python | SQL | JavaScript | etc.]" → "Python, C#, Java, TypeScript, SQL"
                  Never remove or merge the skill category labels.
-             17. If a skill category has no matching data from the candidate's resume, set its
+        17. If a skill category has no matching data from the candidate's resume, set its
                  placeholder value to "" so the entire bullet is removed by the cleanup pass.
+        18. CHRONOLOGICAL ORDERING — across ALL sections (Experience, Projects, Education),
+                                order entries with the MOST RECENT date at the top and the OLDEST at the bottom.
+                                - For Experience: sort by start date, most recent job first.
+                                - For Education: sort by graduation/end date, most recent program first.
+                                - For Projects: sort by most recently worked on or most relevant, most recent first.
+                                - If a role is current/present (e.g. "Aug 2024 – Present"), it ranks as the most
+                                  recent and must always appear first.
+                                - Never mix chronological order — do not place an older job above a newer one.
+        19. SKILLS SECTION LABELS — each skills bullet has a bold label followed by a\s
+                                bracketed placeholder, e.g.:
+                                    "Languages: [Languages: e.g. Java | Python | SQL | JavaScript]"
+                                You must ONLY replace the bracketed portion. The label before the bracket
+                                (e.g. "Languages:", "Frameworks & Libraries:", "Databases:", "Tools & Platforms:",
+                                "Methodologies:", "Professional Skills:", "Certifications:") must be preserved
+                                EXACTLY as-is in your JSON value.
+
+                                For example, the JSON entry should look like:
+                                    "[Languages: e.g. Java | Python | SQL | JavaScript]": "Python, C#, Java, TypeScript, SQL"
+
+                                The label "Languages:" lives outside the bracket in the template and must\s
+                                never be included in or removed by your replacement value.
+        20. DATES — copy every date EXACTLY as written in the candidate's resume. Do not
+                                reformat, estimate, abbreviate, or change any date under any circumstance.
+                                If the original says "Aug 2024 - current", output "Aug 2024 - current" exactly.
+                                If the original says "Sep. 2021 - May 2024", output "Sep. 2021 - May 2024" exactly.
+                                Never invent, approximate, or alter a date. Dishonest dates on a resume are
+                                unacceptable and will disqualify the candidate.
+        21. CONTACT FIELDS — copy [City, State], [Phone Number], [Professional Email],
+            [LinkedIn URL], [GitHub URL] EXACTLY as written in the candidate's resume.
+            Do not infer, guess, or substitute any contact information. If a field is
+            genuinely not present in the resume, set it to "REMOVE". Never fabricate
+        22. PAGE LENGTH — the final resume MUST fit on one page. If space is tight, apply
+            these sacrifices IN ORDER — never skip a level:
+            1. Reduce bullet points per job to 2 (never fewer than 1 per job)
+            2. Shorten bullet point text to be more concise
+            3. Remove the least relevant PROJECT slot
+            4. Remove the project description line, keeping only bullets
+            Font size reduction is handled automatically by the export pipeline as a
+            last resort — focus on concise writing first.
+            NEVER remove an Experience entry under any circumstance.     
+        23. PUNCTUATION — never use em dashes (—) or en dashes (–) anywhere in the resume
+                                body text except as date range separators between two dates
+                                (e.g. "Jun. 2023 - Sep. 2023"). For all other uses replace with:
+                                - A colon ":" for label-to-value relationships
+                                  e.g. "Executive Member: Game Design & Development Club" NOT "Executive Member—Game Design & Development Club"
+                                  e.g. "Member: UDel Competitive Programming Club" NOT "Member—UDel Competitive Programming Club"
+                                - A comma "," for list separation
+                                - A period "." to end a sentence
+                                Never use "—" or "–" mid-sentence or after a label as a stylistic separator.
+                                This rule has zero exceptions outside of date ranges.
+        24. PROFESSIONAL SUMMARY HONESTY — every claim in the Professional Summary MUST be
+                                directly traceable to specific content in the candidate's resume. Do not invent
+                                metrics, role titles, domain expertise, or responsibilities that do not appear
+                                in the resume.
+
+                                ALLOWED — referencing and tailoring real experience:
+                                - If the resume mentions "300+ students" you may reference scale of impact
+                                - If the resume mentions ".NET deployed to 80% of power plants" you may reference
+                                  enterprise-scale systems experience
+                                - You may use job description keywords ONLY if the candidate has demonstrated
+                                  that skill somewhere in their resume
+
+                                NOT ALLOWED — fabricating to match the job description:
+                                - Do not invent user counts, system scales, or metrics not in the resume
+                                - Do not claim domain expertise (e.g. "Mobile Device Management") if the
+                                  candidate has never worked in that domain
+                                - Do not imply responsibilities the candidate has never held
+
+                                If the candidate's experience is not a strong match for a section of the job
+                                description, omit that claim from the summary entirely rather than fabricating it.
+                                Honesty is more important than keyword coverage.
+                                
 ---
         TEMPLATE PLACEHOLDERS (you must provide a value for every key below):
         """ + docxTemplate + """
@@ -322,60 +406,178 @@ public class ClaudeService {
     /**
      * Generates a personalized cover letter for a job application.
      *
-     * If the user provides a previous cover letter, Claude adapts to their
-     * writing voice and tone. Otherwise, a professional default style is used.
+     * When outputFormat is DOCX/WORD, Claude fills the coverletter-docx-template.docx
+     * placeholders and returns JSON — the same approach used for the resume DOCX flow.
+     * For PDF and LaTeX, Claude returns plain text that follows the template's structure,
+     * writing style, font choice (Times New Roman), spacing, and word count.
      *
-     * The letter is 3-4 paragraphs (~300 words) and:
-     *   - Opens with a strong, specific introduction
-     *   - Highlights 2-3 directly relevant achievements
-     *   - Shows genuine interest in the company/role
-     *   - Closes with a confident call to action
+     * If the user provides a previous cover letter, Claude adapts to their voice and tone.
      *
-     * @param request contains the resume, job description, optional previous letter, and skill answers
-     * @return personalized cover letter as plain text
+     * Template spec (coverletter-docx-template.docx):
+     *   - Font: Times New Roman, 11pt
+     *   - Format: Standard business letter
+     *       contact header → date → company → "Dear Hiring Manager," →
+     *       3 body paragraphs → "Sincerely," → candidate name
+     *   - Spacing: ~0.33 in before/after each paragraph (240 twips)
+     *   - Tone: Formal but personable, first-person, no generic openers
+     *   - Word count: 250–350 words across the three body paragraphs
+     *
+     * @param request contains the resume, job description, output format,
+     *                optional previous letter, and skill answers
+     * @return JSON string (DOCX) or plain text (PDF/LaTeX) cover letter content
      */
     public String generateCoverLetter(CoverLetterRequest request) {
-        log.debug("Generating cover letter");
+        log.debug("Generating cover letter (format: {})", request.getOutputFormat());
 
         String skillAnswerContext = buildSkillAnswerContext(request.getSkillAnswers());
         boolean hasPreviousLetter = request.getPreviousCoverLetter() != null
                 && !request.getPreviousCoverLetter().isBlank();
 
-        String prompt = """
-                You are an expert cover letter writer who creates compelling, personalized cover letters.
+        boolean isDocx = "WORD".equalsIgnoreCase(request.getOutputFormat())
+                || "DOCX".equalsIgnoreCase(request.getOutputFormat());
 
-                Write a professional cover letter for this job application.
+        String docxTemplate = isDocx ? loadCoverLetterDocxTemplateText() : null;
 
-                **Requirements:**
-                - Length: 3-4 paragraphs, approximately 250-350 words
-                - Opening: Strong, attention-grabbing — reference the specific role and company
-                - Body: 2-3 specific, quantified achievements that directly match the job requirements
-                - Closing: Confident, clear call to action
-                - Tone: Professional but personable — avoid generic phrases like "I am writing to apply for..."
-                """
-                + (hasPreviousLetter ? """
-                - IMPORTANT: Match the writing style and tone of the previous cover letter provided below.
-                  The candidate has a specific voice — preserve it.
-                """ : "")
-                + """
+        String prompt;
 
-                ---
-                CANDIDATE'S RESUME:
-                """ + request.getResumeText() + """
+        if (isDocx && docxTemplate != null) {
+            // ── DOCX path: fill template placeholders, return JSON ──────────────
+            prompt = """
+                    You are an expert cover letter writer.
 
-                ---
-                JOB DESCRIPTION:
-                """ + request.getJobDescription()
-                + (hasPreviousLetter ? """
+                    Fill in the cover letter template below by replacing every [bracket placeholder]
+                    with the candidate's real information, tailored to the job description.
 
-                ---
-                PREVIOUS COVER LETTER (match this style and tone):
-                """ + request.getPreviousCoverLetter() : "")
-                + (skillAnswerContext.isEmpty() ? "" : """
+                    WRITING STYLE — match the template EXACTLY:
+                    - Font: Times New Roman, 11pt (implied by the template — write accordingly)
+                    - Page format: Standard business letter
+                        * Candidate contact block at top (name, city/state, email, phone)
+                        * Date line
+                        * Company name
+                        * Greeting: "Dear Hiring Manager,"
+                        * 3 body paragraphs
+                        * Closing: "Sincerely," followed by candidate name
+                    - Spacing: One blank line between each section/paragraph
+                    - Tone: Professional, personable, sincere — formal but human
+                    - Sentences: Complete, grammatically correct sentences.
+                      NO dashes used to break up sentences. NO bullet points in the body.
+                    - Word count: 250–350 words across the three body paragraphs combined
+                    - No bold or italic text in the body paragraphs
 
-                ---
-                ADDITIONAL EXPERIENCE TO INCORPORATE:
-                """ + skillAnswerContext);
+                    CRITICAL RULES:
+                    1.  Return ONLY a valid JSON object. No explanation, no markdown fences, no text before or after.
+                    2.  Each key must be the EXACT placeholder text including brackets,
+                        e.g. "[Your Full Name]", "[Job Title]", "[Company Name]".
+                    3.  Each value is a plain string. No nested JSON, no extra brackets.
+                    4.  NEVER leave a placeholder value as its template hint text — replace it with
+                        real, specific content drawn from the candidate's resume and job description.
+                    5.  [Company Name] appears in multiple places — always supply the same value.
+                    6.  [Date] — format as "Month DD, YYYY" using today's date (March 19, 2026).
+                    7.  Contact fields ([Your Full Name], [City, State, ZIP], [Email Address],
+                        [Phone Number]) — copy EXACTLY from the candidate's resume.
+                        If genuinely missing, set the value to "REMOVE".
+                    8.  [Your Name] at the sign-off — use the same value as [Your Full Name].
+                    9.  NEVER output any text that still contains [ or ] characters in the final result.
+                        If a placeholder cannot be filled, set it to "" — never leave bracket text.
+                    10. Write body paragraphs that flow naturally in first-person, active voice.
+                        Content must be specific — reference real details from the resume and job description.
+                    11. DO NOT invent experience or qualifications not present in the resume.
+                    12. Avoid generic openers like "I am writing to apply for..." or
+                        "I believe I would be a great fit..." — open with something compelling and specific.
+                    """
+                    + (hasPreviousLetter ? """
+                    13. Match the writing voice and tone of the previous cover letter provided below.
+                        The candidate has a specific voice — preserve it throughout.
+                    """ : "")
+                    + """
+
+                    ---
+                    TEMPLATE PLACEHOLDERS (provide a value for EVERY key below):
+                    """ + docxTemplate + """
+
+                    ---
+                    CANDIDATE'S RESUME:
+                    """ + request.getResumeText() + """
+
+
+                    ---
+                    JOB DESCRIPTION:
+                    """ + request.getJobDescription()
+                    + (hasPreviousLetter ? """
+
+                    ---
+                    PREVIOUS COVER LETTER (match this candidate's writing voice and tone):
+                    """ + request.getPreviousCoverLetter() : "")
+                    + (skillAnswerContext.isEmpty() ? "" : """
+
+                    ---
+                    ADDITIONAL EXPERIENCE TO INCORPORATE:
+                    """ + skillAnswerContext);
+
+        } else {
+            // ── PDF / LaTeX / plain-text path ────────────────────────────────────
+            // Instruct Claude to follow the same template structure and style
+            // even without the actual DOCX file.
+            prompt = """
+                    You are an expert cover letter writer who creates compelling, personalized cover letters.
+
+                    Write a professional cover letter for this job application.
+
+                    WRITING STYLE — follow the template format exactly:
+                    - Font style: Times New Roman, 11pt (professional serif) — write for a clean, formal look
+                    - Page format: Standard business letter layout:
+                        * Candidate contact block: name, city/state, email, phone (one item per line)
+                        * Today's date: March 19, 2026
+                        * Recipient: company name
+                        * Greeting: "Dear Hiring Manager,"
+                        * 3 body paragraphs (no bullet points, no subheadings)
+                        * Closing: "Sincerely," followed by a blank line, then the candidate's name
+                    - Spacing: One blank line between each section/paragraph
+                    - Tone: Professional, personable, sincere — formal but human, first-person active voice
+                    - Sentences: Complete, grammatically correct sentences.
+                      NO dashes used to break up sentences. NO bullet points in the body.
+                    - Word count: 250–350 words across the three body paragraphs combined
+                    - No bold or italic formatting in the body
+
+                    PARAGRAPH STRUCTURE (3 body paragraphs):
+                    1. Opening — Name the specific role and company. Express genuine interest by
+                       referencing something concrete about the company (mission, product, values, or impact).
+                    2. Experience & Background — Highlight 2–3 relevant achievements from the candidate's
+                       resume with specific details and numbers where available. Connect skills directly
+                       to the job requirements.
+                    3. Projects / Additional Strengths — Reference a relevant project or additional skill
+                       area. Demonstrate the ability to deliver real results.
+                    4. Closing — Express enthusiasm, invite further conversation, thank the reader.
+
+                    REQUIREMENTS:
+                    - Incorporate exact keywords from the job description naturally
+                    - Do NOT invent experience — only use what is in the resume
+                    - Avoid generic phrases like "I am writing to apply for..." or "I believe I would be..."
+                    """
+                    + (hasPreviousLetter ? """
+                    - IMPORTANT: Match the writing style, tone, and voice of the previous cover letter
+                      provided below. The candidate has a specific voice — preserve it throughout.
+                    """ : "")
+                    + """
+
+                    ---
+                    CANDIDATE'S RESUME:
+                    """ + request.getResumeText() + """
+
+                    ---
+                    JOB DESCRIPTION:
+                    """ + request.getJobDescription()
+                    + (hasPreviousLetter ? """
+
+                    ---
+                    PREVIOUS COVER LETTER (match this style, tone, and voice):
+                    """ + request.getPreviousCoverLetter() : "")
+                    + (skillAnswerContext.isEmpty() ? "" : """
+
+                    ---
+                    ADDITIONAL EXPERIENCE TO INCORPORATE:
+                    """ + skillAnswerContext);
+        }
 
         String result = callClaude(prompt);
         log.info("Cover letter generation complete ({} chars)", result.length());
@@ -466,6 +668,31 @@ public class ClaudeService {
             }
         } catch (IOException e) {
             log.warn("Could not load LaTeX resume template — falling back to default output: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Extracts plain text (including bracket placeholders) from the DOCX cover letter template.
+     * Uses Apache POI to iterate through every paragraph and concatenate their text.
+     * Returns null (and logs a warning) if the file is missing or unreadable.
+     */
+    private String loadCoverLetterDocxTemplateText() {
+        try {
+            if (coverLetterDocxTemplateResource.exists()) {
+                try (XWPFDocument doc = new XWPFDocument(coverLetterDocxTemplateResource.getInputStream())) {
+                    StringBuilder sb = new StringBuilder();
+                    for (XWPFParagraph para : doc.getParagraphs()) {
+                        String text = para.getText();
+                        sb.append(text).append("\n");
+                    }
+                    String template = sb.toString();
+                    log.debug("Loaded cover letter DOCX template ({} chars)", template.length());
+                    return template;
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Could not load cover letter DOCX template — falling back to default output: {}", e.getMessage());
         }
         return null;
     }
