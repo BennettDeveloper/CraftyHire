@@ -149,6 +149,11 @@ public class FileExportService {
         // Parse Claude's JSON response into a placeholder map
         Map<String, String> replacements = parsePlaceholderJson(content);
 
+        // Extract compression flag before replacements run so it never
+        // gets stamped into the document as a placeholder value
+        boolean shouldCompress = "true".equalsIgnoreCase(replacements.remove("COMPRESS_FONT"));
+        log.info("Font compression requested by Claude: {}", shouldCompress);
+
         try (XWPFDocument document = openDocxTemplate(template);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
@@ -168,17 +173,17 @@ public class FileExportService {
                 }
             }
 
-            // Reduce font size if content is too long to fit one page
-            compressToOnePage(document);
+            // Only compress font if Claude determined content is too long
+            if (shouldCompress) {
+                compressToOnePage(document);
+            }
 
-            // After all replacements, remove empty paragraphs that were
-            // placeholder-only bullets with no content
+            // After all replacements, remove empty paragraphs
             removeEmptyParagraphs(document);
 
             document.write(out);
             log.info("DOCX export complete: {} bytes", out.size());
             return out.toByteArray();
-
         }
     }
 

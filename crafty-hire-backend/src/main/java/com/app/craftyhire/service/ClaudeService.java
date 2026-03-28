@@ -287,14 +287,23 @@ public class ClaudeService {
             Do not infer, guess, or substitute any contact information. If a field is
             genuinely not present in the resume, set it to "REMOVE". Never fabricate
         22. PAGE LENGTH — the final resume MUST fit on one page. If space is tight, apply
-            these sacrifices IN ORDER — never skip a level:
-            1. Reduce bullet points per job to 2 (never fewer than 1 per job)
-            2. Shorten bullet point text to be more concise
-            3. Remove the least relevant PROJECT slot
-            4. Remove the project description line, keeping only bullets
-            Font size reduction is handled automatically by the export pipeline as a
-            last resort — focus on concise writing first.
-            NEVER remove an Experience entry under any circumstance.     
+                                these sacrifices IN ORDER — never skip a level:
+                                1. Shorten bullet point text to be more concise
+                                2. Reduce bullet points per job to 2 (never fewer than 1 per job)
+                                3. Reduce project bullets to 1 per project
+                                4. Remove project description lines, keeping only bullets
+                                5. Remove the least relevant PROJECT slot entirely
+                                6. Suggest reducing font size (the export pipeline will handle this
+                                   automatically — flag it by adding this exact line at the very end
+                                   of your JSON response, outside all other fields:
+                                   "COMPRESS_FONT": "true")
+                                NEVER remove Education or Experience entries under any circumstance.
+                                Education is always included even if trimmed to just the degree name,
+                                institution, and graduation year with no additional detail.
+                                Priority order highest to lowest:
+                                - Experience (never sacrificed)
+                                - Education (never sacrificed, may be trimmed to one line)
+                                - Projects (first to be cut if space is needed) 
         23. PUNCTUATION — never use em dashes (—) or en dashes (–) anywhere in the resume
                                 body text except as date range separators between two dates
                                 (e.g. "Jun. 2023 - Sep. 2023"). For all other uses replace with:

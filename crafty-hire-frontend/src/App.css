@@ -797,6 +797,201 @@
   gap: 0.375rem;
 }
 
+/* ─── Resume Editor ──────────────────────────────────────────────────────── */
+.resume-editor {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  margin-top: 1rem;
+  overflow: hidden;
+}
+
+.resume-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.375rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-orange-light);
+}
+
+.resume-editor__header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-orange);
+}
+
+.resume-editor__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-orange);
+}
+
+.resume-editor__close {
+  background: none;
+  color: var(--color-text-muted);
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  transition: color 0.15s, background 0.15s;
+}
+.resume-editor__close:hover {
+  color: var(--color-text);
+  background: rgba(0,0,0,0.06);
+}
+
+.resume-editor__hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  padding: 0.625rem 1.375rem 0;
+  line-height: 1.5;
+}
+
+.resume-editor__req-star {
+  color: var(--color-orange);
+  font-weight: 700;
+}
+
+.resume-editor__dl-error {
+  margin: 0 1.375rem;
+}
+
+.resume-editor__footer {
+  padding: 1rem 1.375rem 1.375rem;
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.5rem;
+}
+
+/* Editor sections */
+.editor-section {
+  padding: 1rem 1.375rem 0;
+}
+
+.editor-section + .editor-section {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+}
+
+.editor-section__title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-orange);
+  margin-bottom: 0.75rem;
+}
+
+/* Groups (Job 1, Project 2 etc.) */
+.editor-group + .editor-group {
+  margin-top: 0.875rem;
+}
+
+.editor-group--titled {
+  background: #FAFAFA;
+  border: 1px solid #ECECEC;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.editor-group__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.editor-group__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem 0.875rem;
+}
+
+/* Fields */
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Bullet + Summary + Description span full width */
+.editor-field:has(.editor-field__textarea) {
+  grid-column: 1 / -1;
+}
+
+.editor-field__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.editor-field--empty .editor-field__label {
+  color: #AAAAAA;
+}
+
+.editor-field__input,
+.editor-field__textarea {
+  font-size: 0.875rem;
+}
+
+/* Empty field styling — greyed border + placeholder */
+.editor-field--empty .editor-field__input,
+.editor-field--empty .editor-field__textarea {
+  border-color: #DCDCDC;
+  background: #FAFAFA;
+  color: #999;
+}
+
+.editor-field__input::placeholder,
+.editor-field__textarea::placeholder {
+  color: #BBBBBB;
+  font-style: italic;
+}
+
+/* Error states */
+.input--error,
+.textarea--error {
+  border-color: var(--color-error) !important;
+}
+
+/* Inline spinner inside Download button */
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  vertical-align: middle;
+  margin-right: 0.4em;
+}
+
+/* Edit Resume button variants */
+.btn--edit-active {
+  background: var(--color-orange-light);
+  color: var(--color-orange);
+  border: 1px solid var(--color-orange-mid);
+}
+.btn--edit-active:hover {
+  background: #fde8d4;
+}
+
+/* Unsaved-edits indicator dot */
+.edit-dirty-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--color-orange);
+  border-radius: 50%;
+  margin-left: 0.4em;
+  vertical-align: middle;
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 800px) {
   .workspace {
